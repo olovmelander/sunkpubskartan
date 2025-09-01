@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stockholm Sunkpubskarta - Hitta billig öl</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .toggle-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(30, 30, 30, 0.95));
+            backdrop-filter: blur(20px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1002;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 50px rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .toggle-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8), 0 0 70px rgba(255, 215, 0, 0.2);
+        }
+
+        .toggle-button.panel-open {
+            right: 370px;
+        }
+
+        .hamburger {
+            width: 24px;
+            height: 20px;
+            position: relative;
+            transform: rotate(0deg);
+            transition: .5s ease-in-out;
+            cursor: pointer;
+        }
+
+        .hamburger span {
+            display: block;
+            position: absolute;
+            height: 3px;
+            width: 100%;
+            background: #FFD700;
+            border-radius: 9px;
+            opacity: 1;
+            left: 0;
+            transform: rotate(0deg);
+            transition: .25s ease-in-out;
+        }
+
+        .hamburger span:nth-child(1) {
+            top: 0px;
+        }
+
+        .hamburger span:nth-child(2) {
+            top: 8px;
+        }
+
+        .hamburger span:nth-child(3) {
+            top: 16px;
+        }
+
+        .toggle-button.panel-open .hamburger span:nth-child(1) {
+            top: 8px;
+            transform: rotate(135deg);
+        }
+
+        .toggle-button.panel-open .hamburger span:nth-child(2) {
+            opacity: 0;
+            left: -60px;
+        }
+
+        .toggle-button.panel-open .hamburger span:nth-child(3) {
+            top: 8px;
+            transform: rotate(-135deg);
+        }
+
+        .control-panel {
+            position: fixed;
+            top: 20px;
+            right: -370px;
+            background: linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(30, 30, 30, 0.95));
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 25px;
+            z-index: 1000;
+            width: 350px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 100px rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            transition: right 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .control-panel.open {
+            right: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid transparent;
+            border-image: linear-gradient(90deg, #FFD700, #FFA500) 1;
+            position: relative;
+        }
+
+        .beer-icon {
+            font-size: 2.5em;
+            margin-right: 15px;
+            animation: wobble 3s infinite;
+        }
+
+        @keyframes wobble {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
+        }
+
+        h1 {
+            font-size: 1.6em;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 0.8em;
+            color: #999;
+            position: absolute;
+            bottom: 0;
+            left: 60px;
+        }
+
+        .time-control {
+            margin-bottom: 30px;
+        }
+
+        .time-display {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 165, 0, 0.1));
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            border: 2px solid rgba(255, 215, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .time-display::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .current-time {
+            font-size: 3em;
+            font-weight: bold;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            position: relative;
+            z-index: 1;
+        }
+
+        .day-selector {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .day-btn {
+            padding: 8px 5px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .day-btn:hover {
+            background: rgba(255, 215, 0, 0.2);
+            transform: translateY(-2px);
+            color: #fff;
+        }
+
+        .day-btn.active {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-weight: 700;
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 215, 0, 0.4);
+        }
+
+        .slider-container {
+            position: relative;
+            padding: 10px 0;
+        }
+
+        .time-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 10px;
+            background: linear-gradient(90deg, 
+                #2ecc71 0%, 
+                #f1c40f 30%, 
+                #e67e22 70%, 
+                #e74c3c 100%);
+            outline: none;
+            appearance: none;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+
+        .time-slider:hover {
+            opacity: 1;
+        }
+
+        .time-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #FFD700, #FFA500);
+            cursor: grab;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.6);
+            border: 2px solid #fff;
+        }
+
+        .time-slider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.1);
+        }
+
+        .time-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #FFD700, #FFA500);
+            cursor: grab;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.6);
+            border: 2px solid #fff;
+        }
+
+        .time-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.75em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .legend {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .legend h3 {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: #FFD700;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .legend-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateX(-5px);
+        }
+
+        .legend-item.inactive {
+            opacity: 0.4;
+        }
+
+        .legend-item.active {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 12px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .filter-checkbox {
+            position: absolute;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #FFD700;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .filter-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .filter-btn:hover {
+            background: rgba(255, 215, 0, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-weight: 700;
+        }
+
+        .stats {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 165, 0, 0.05));
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 0.95em;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            transition: all 0.3s;
+        }
+
+        .stat-item:hover {
+            background: rgba(0, 0, 0, 0.5);
+            transform: translateX(-5px);
+        }
+
+        .stat-label {
+            color: #999;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: #FFD700;
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 2px solid rgba(255, 215, 0, 0.5);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .leaflet-popup-content {
+            margin: 15px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .leaflet-popup-tip {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .popup-content {
+            min-width: 250px;
+        }
+
+        .popup-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #333;
+            border-bottom: 2px solid #FFD700;
+            padding-bottom: 8px;
+        }
+
+        .popup-price {
+            font-size: 2em;
+            font-weight: 700;
+            margin: 15px 0;
+            padding: 10px;
+            background: linear-gradient(135deg, rgba(46, 204, 113, 0.1), rgba(39, 174, 96, 0.05));
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #2ecc71;
+        }
+
+        .popup-info {
+            font-size: 0.9em;
+            color: #555;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .popup-info:last-child {
+            border-bottom: none;
+        }
+
+        .popup-happy {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            font-weight: 700;
+            text-align: center;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 8px 25px rgba(255, 215, 0, 0.6);
+            }
+        }
+
+        .happy-hour-badge {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.1em;
+            z-index: 1000;
+            animation: bounce 2s infinite;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.5);
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .control-panel {
+                width: calc(100% - 20px);
+                right: -100%;
+                left: auto;
+                max-height: 70vh;
+            }
+
+            .control-panel.open {
+                right: 10px;
+            }
+
+            .toggle-button {
+                right: 10px;
+                top: 10px;
+            }
+
+            .toggle-button.panel-open {
+                right: 10px;
+            }
+
+            .day-selector {
+                grid-template-columns: repeat(7, 1fr);
+                gap: 3px;
+            }
+
+            .day-btn {
+                font-size: 0.75em;
+                padding: 6px 2px;
+            }
+
+            .happy-hour-badge {
+                top: 70px;
+                left: 10px;
+                font-size: 0.9em;
+                padding: 10px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <button class="toggle-button" id="togglePanel">
+        <div class="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </button>
+    
+    <div class="control-panel" id="controlPanel">
+        <div class="header">
+            <span class="beer-icon">🍺</span>
+            <div>
+                <h1>Stockholm Sunkpubskarta</h1>
+                <div class="subtitle">60 barer med billig öl innanför tullarna</div>
+            </div>
+        </div>
+
+        <div class="time-control">
+            <div class="time-display">
+                <div class="current-time" id="timeDisplay">17:00</div>
+            </div>
+            
+            <div class="day-selector">
+                <button class="day-btn" data-day="mon">Mån</button>
+                <button class="day-btn" data-day="tue">Tis</button>
+                <button class="day-btn active" data-day="wed">Ons</button>
+                <button class="day-btn" data-day="thu">Tor</button>
+                <button class="day-btn" data-day="fri">Fre</button>
+                <button class="day-btn" data-day="sat">Lör</button>
+                <button class="day-btn" data-day="sun">Sön</button>
+            </div>
+            
+            <div class="slider-container">
+                <input type="range" class="time-slider" id="timeSlider" min="12" max="27" value="17" step="0.5">
+                <div class="time-labels">
+                    <span>12:00</span>
+                    <span>18:00</span>
+                    <span>00:00</span>
+                    <span>03:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="legend">
+            <h3>🎨 Prisnivåer - Klicka för att filtrera</h3>
+            <div class="legend-item active" data-min="0" data-max="30">
+                <div class="legend-color" style="background: linear-gradient(135deg, #2ecc71, #27ae60);"></div>
+                <span><strong>&lt; 30 kr</strong> - Riktigt billigt! 🎉</span>
+                <input type="checkbox" class="filter-checkbox" checked>
+            </div>
+            <div class="legend-item active" data-min="30" data-max="40">
+                <div class="legend-color" style="background: linear-gradient(135deg, #f1c40f, #f39c12);"></div>
+                <span><strong>30-40 kr</strong> - Bra pris 👍</span>
+                <input type="checkbox" class="filter-checkbox" checked>
+            </div>
+            <div class="legend-item active" data-min="40" data-max="50">
+                <div class="legend-color" style="background: linear-gradient(135deg, #e67e22, #d35400);"></div>
+                <span><strong>40-50 kr</strong> - Okej pris 🤷</span>
+                <input type="checkbox" class="filter-checkbox" checked>
+            </div>
+            <div class="legend-item active" data-min="50" data-max="999">
+                <div class="legend-color" style="background: linear-gradient(135deg, #e74c3c, #c0392b);"></div>
+                <span><strong>&gt; 50 kr</strong> - Dyrt 😬</span>
+                <input type="checkbox" class="filter-checkbox" checked>
+            </div>
+            <div class="filter-controls">
+                <button class="filter-btn" id="selectAll">Visa alla</button>
+                <button class="filter-btn" id="clearAll">Rensa filter</button>
+                <button class="filter-btn" id="budgetOnly">Bara billigt (&lt;40)</button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-label">🔍 Visar barer:</span>
+                <span class="stat-value" id="barCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">🎉 Happy Hour nu:</span>
+                <span class="stat-value" id="happyCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">💰 Billigaste ölen:</span>
+                <span class="stat-value" id="cheapest">-</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">🏆 Billigaste bar:</span>
+                <span class="stat-value" id="cheapestBar" style="font-size: 0.9em;">-</span>
+            </div>
+            <div class="stat-item" style="background: linear-gradient(135deg, #2ecc71, #27ae60); color: white;">
+                <span class="stat-label">🍺 Under 30 kr (synliga):</span>
+                <span class="stat-value" id="under30Count" style="color: white;">0</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="happy-hour-badge" id="happyBadge" style="display: none;">
+        🎊 Happy Hour på <span id="happyNumber">0</span> ställen!
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        // Wait for DOM and Leaflet to load
+        window.addEventListener('DOMContentLoaded', function() {
+            if (typeof L !== 'undefined') {
+                initializeMap();
+            } else {
+                setTimeout(function() {
+                    if (typeof L !== 'undefined') {
+                        initializeMap();
+                    }
+                }, 1000);
+            }
+        });
+        
+        function initializeMap() {
+            // Bar data - all 60 bars
+            const bars = [
+			  {
+				name: "Lion Bar Hornstull",
+				address: "Hornsgatan 154",
+				lat: 59.31584,
+				lng: 18.0373686,
+				normalPrice: 23,
+				happyHourPrice: 23,
+				happyHourEnd: 24,
+				area: "Hornstull",
+				description: "Stockholms billigaste öl! Sportkrog populär bland studenter",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Södra Sidan Pub",
+				address: "Folkungagatan 57",
+				lat: 59.3146244,
+				lng: 18.0758558,
+				normalPrice: 29,
+				happyHourPrice: 29,
+				happyHourEnd: 24,
+				area: "SoFo",
+				description: "Äkta sunkhak med stammis-kultur. 5/5 i betyg!",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Lion Bar Gamla Stan",
+				address: "Kornhamnstorg 61",
+				lat: 59.3222881,
+				lng: 18.0724576,
+				normalPrice: 33,
+				happyHourPrice: 25,
+				happyHourEnd: 20,
+				area: "Gamla Stan",
+				description: "Billig öl mitt i turistområdet",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Lion Bar Sveavägen 39",
+				address: "Sveavägen 39",
+				lat: 59.3373251,
+				lng: 18.0615161,
+				normalPrice: 33,
+				happyHourPrice: 25,
+				happyHourEnd: 20,
+				area: "Norrmalm",
+				description: "Studentvänlig bar nära T-Centralen",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Lion Bar Sveavägen 74",
+				address: "Sveavägen 74",
+				lat: 59.3398405,
+				lng: 18.0597918,
+				normalPrice: 33,
+				happyHourPrice: 25,
+				happyHourEnd: 20,
+				area: "Vasastan",
+				description: "Populär förköksbar",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Dovas",
+				address: "Hornsgatan 90",
+				lat: 59.3178287,
+				lng: 18.053197,
+				normalPrice: 30,
+				happyHourPrice: 25,
+				happyHourEnd: 19,
+				area: "Södermalm",
+				description: "Stockholms mest ikoniska billiga krog. Autentisk sunkhak!",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Carmen",
+				address: "Tjärhovsgatan 14",
+				lat: 59.3150949,
+				lng: 18.0760102,
+				normalPrice: 39,
+				happyHourPrice: 30,
+				happyHourEnd: 18,
+				area: "SoFo",
+				description: "Mörk, konstnärlig bar på två våningar. Stockholms mest kända sunkhak!",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Crazy Horse",
+				address: "Götgatan 44",
+				lat: 59.3161712,
+				lng: 18.0722065,
+				normalPrice: 32,
+				happyHourPrice: 32,
+				happyHourEnd: 24,
+				area: "Slussen",
+				description: "Amerikansk Wild West‑saloon med mörk interiör",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Retro Bar Sveavägen",
+				address: "Sveavägen 120",
+				lat: 59.3449516,
+				lng: 18.054976,
+				normalPrice: 39,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				happyHourDays: ["mon", "tue", "wed", "thu", "fri"],
+				area: "Vasastan",
+				description: "Sportbar med stor stark för 29kr på vardagar",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Balthazar",
+				address: "Högbergsgatan 33",
+				lat: 59.3166006,
+				lng: 18.0728447,
+				normalPrice: 39,
+				happyHourPrice: 29,
+				happyHourEnd: 18,
+				happyHourStart: 16,
+				area: "SoFo",
+				description: "Svensk ölhall med frekventa kampanjer",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Nivå 22",
+				address: "Fridhemsgatan 17",
+				lat: 59.3327735,
+				lng: 18.0282712,
+				normalPrice: 28,
+				happyHourPrice: 25,
+				happyHourEnd: 24,
+				area: "Kungsholmen",
+				description: "Permanent happy hour! Norrlands Guld 28kr, Heineken 25kr",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "International Bar",
+				address: "Mälartorget 13",
+				lat: 59.3233373,
+				lng: 18.0684823,
+				normalPrice: 39,
+				happyHourPrice: 29,
+				happyHourEnd: 18,
+				area: "Gamla Stan",
+				description: "Dold pärla i Gamla Stan",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Kelly's Bar",
+				address: "Folkungagatan 49",
+				lat: 59.3144473,
+				lng: 18.074463,
+				normalPrice: 42,
+				happyHourPrice: 35,
+				happyHourEnd: 18,
+				area: "SoFo",
+				description: "Lokal favorit med irländsk atmosfär",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Gröna Jägaren",
+				address: "Götgatan 64",
+				lat: 59.314918,
+				lng: 18.0729163,
+				normalPrice: 45,
+				happyHourPrice: 35,
+				happyHourEnd: 18,
+				area: "Medborgarplatsen",
+				description: "Karaoke, gaming, öppet 365 dagar om året!",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Hirschenkeller",
+				address: "Sveavägen 61",
+				lat: 59.3409828,
+				lng: 18.0580721,
+				normalPrice: 39,
+				happyHourPrice: 39,
+				happyHourEnd: 24,
+				area: "Vasastan",
+				description: "Tysk pubstil sedan 1976",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Pub Anchor",
+				address: "Sveavägen 90",
+				lat: 59.3413206,
+				lng: 18.0583979,
+				normalPrice: 45,
+				happyHourPrice: 38,
+				happyHourEnd: 19,
+				area: "Vasastan",
+				description: "Rockbar med karaoke och uteservering",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Pelikan",
+				address: "Blekingegatan 40",
+				lat: 59.3106348,
+				lng: 18.0764671,
+				normalPrice: 52,
+				happyHourPrice: 52,
+				happyHourEnd: 24,
+				area: "Södermalm",
+				description: "Klassisk arbetarkrog sedan 1904. Autentisk jugend‑interiör!",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Kvarnen",
+				address: "Tjärhovsgatan 4",
+				lat: 59.3148739,
+				lng: 18.0743313,
+				normalPrice: 48,
+				happyHourPrice: 48,
+				happyHourEnd: 24,
+				area: "SoFo",
+				description: "En av Stockholms äldsta ölhallar sedan 1908",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Baras Medborgarplatsen",
+				address: "Medborgarplatsen 25",
+				lat: 59.3155604,
+				lng: 18.0710795,
+				normalPrice: 39,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				area: "Medborgarplatsen",
+				description: "Extremt plånboksvänligt mitt på Medis",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Bara Enkelt",
+				address: "Skånegatan 59",
+				lat: 59.3122872,
+				lng: 18.0791293,
+				normalPrice: 29,
+				happyHourPrice: 29,
+				happyHourEnd: 24,
+				area: "SoFo",
+				description: "29kr hela kvällen – inga restriktioner!",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Lilla Blå",
+				address: "Swedenborgsgatan 22",
+				lat: 59.3149752,
+				lng: 18.0644207,
+				normalPrice: 38,
+				happyHourPrice: 28,
+				happyHourEnd: 19,
+				area: "Mariatorget",
+				description: "Mysig kvarterskrog med billig öl",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Snaps Bar & Bistro",
+				address: "Medborgarplatsen 3",
+				lat: 59.3144846,
+				lng: 18.0712026,
+				normalPrice: 42,
+				happyHourPrice: 32,
+				happyHourEnd: 18,
+				area: "Medborgarplatsen",
+				description: "Happy hour varje dag till 18:00",
+				openUntil: "23:00"
+			  },
+			  {
+				name: "Söderkällaren",
+				address: "Åsögatan 140",
+				lat: 59.3135301,
+				lng: 18.0792655,
+				normalPrice: 35,
+				happyHourPrice: 27,
+				happyHourEnd: 20,
+				area: "SoFo",
+				description: "Källarkrog med rockmusik och billig öl",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Stampen",
+				address: "Stora Nygatan 5",
+				lat: 59.3252169,
+				lng: 18.0677152,
+				normalPrice: 45,
+				happyHourPrice: 35,
+				happyHourEnd: 19,
+				area: "Gamla Stan",
+				description: "Jazzklubb med ölpriser från förr",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Wirströms Pub",
+				address: "Stora Nygatan 13",
+				lat: 59.3248503,
+				lng: 18.0683021,
+				normalPrice: 40,
+				happyHourPrice: 30,
+				happyHourEnd: 19,
+				area: "Gamla Stan",
+				description: "Klassisk pub i källarvalv",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Monks Porter House",
+				address: "Munkbrogatan 11",
+				lat: 59.3235065,
+				lng: 18.0682129,
+				normalPrice: 48,
+				happyHourPrice: 38,
+				happyHourEnd: 18,
+				area: "Gamla Stan",
+				description: "Belgisk ölbar med happy hour",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "The Liffey",
+				address: "Stora Nygatan 40",
+				lat: 59.3234712,
+				lng: 18.0703139,
+				normalPrice: 44,
+				happyHourPrice: 34,
+				happyHourEnd: 19,
+				area: "Gamla Stan",
+				description: "Irländsk pub med live musik",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Soldaten Svejk",
+				address: "Östgötagatan 35",
+				lat: 59.3143931,
+				lng: 18.0767076,
+				normalPrice: 36,
+				happyHourPrice: 28,
+				happyHourEnd: 19,
+				area: "SoFo",
+				description: "Tjeckisk ölhall med stora glas",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Bierhaus",
+				address: "Sankt Eriksgatan 56",
+				lat: 59.3362385,
+				lng: 18.0341965,
+				normalPrice: 39,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				happyHourDays: ["mon", "tue", "wed", "thu", "fri"],
+				area: "Vasastan",
+				description: "Tysk ölstuga med bratwurst",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Tennstopet",
+				address: "Dalagatan 50",
+				lat: 59.341907,
+				lng: 18.0455874,
+				normalPrice: 52,
+				happyHourPrice: 52,
+				happyHourEnd: 24,
+				area: "Vasastan",
+				description: "Klassisk ölhall sedan 1920‑talet",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Man in the Moon",
+				address: "Tegnérgatan 2",
+				lat: 59.3408395,
+				lng: 18.064451,
+				normalPrice: 43,
+				happyHourPrice: 33,
+				happyHourEnd: 19,
+				area: "Vasastan",
+				description: "Engelsk pub med fotboll på TV",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Röda Rummet",
+				address: "Upplandsgatan 6",
+				lat: 59.3366363,
+				lng: 18.0547188,
+				normalPrice: 37,
+				happyHourPrice: 29,
+				happyHourEnd: 18,
+				area: "Vasastan",
+				description: "Strindberg‑inspirerad krog",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Rågsved Folkets Hus Bar",
+				address: "Folkungagatan 58",
+				lat: 59.3143811,
+				lng: 18.0756898,
+				normalPrice: 28,
+				happyHourPrice: 28,
+				happyHourEnd: 24,
+				area: "SoFo",
+				description: "Folkets hus med arbetarpriser",
+				openUntil: "22:00"
+			  },
+			  {
+				name: "Salong Bar",
+				address: "Renstiernas gata 30",
+				lat: 59.3133915,
+				lng: 18.0846385,
+				normalPrice: 34,
+				happyHourPrice: 26,
+				happyHourEnd: 20,
+				area: "SoFo",
+				description: "Hipster‑sunkhak med retrofåtöljer",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Far & Son",
+				address: "Bondegatan 22",
+				lat: 59.3128368,
+				lng: 18.0791745,
+				normalPrice: 41,
+				happyHourPrice: 31,
+				happyHourEnd: 18,
+				area: "SoFo",
+				description: "Generationskrog med traditioner",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Harvest Home",
+				address: "Bondegatan 44",
+				lat: 59.3132625,
+				lng: 18.0827775,
+				normalPrice: 46,
+				happyHourPrice: 36,
+				happyHourEnd: 18,
+				area: "SoFo",
+				description: "Brittisk pub med dart och quiz",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Omnipollos Hatt",
+				address: "Hökens gata 1",
+				lat: 59.3180293,
+				lng: 18.0721335,
+				normalPrice: 55,
+				happyHourPrice: 45,
+				happyHourEnd: 17,
+				area: "Mariatorget",
+				description: "Craft beer‑bar med pizzor",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Copperfields",
+				address: "Tegnérgatan 24",
+				lat: 59.3391564,
+				lng: 18.0583338,
+				normalPrice: 42,
+				happyHourPrice: 32,
+				happyHourEnd: 19,
+				area: "Vasastan",
+				description: "Sportbar med många TV‑skärmar",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Retro Bar Sankt Eriksgatan",
+				address: "Sankt Eriksgatan 22",
+				lat: 59.3315742,
+				lng: 18.0311575,
+				normalPrice: 39,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				happyHourDays: ["mon", "tue", "wed", "thu", "fri"],
+				area: "Vasastan",
+				description: "Retro‑kedjan med happy hour",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Bishops Arms Gamla Stan",
+				address: "Tyska Brinken 36",
+				lat: 59.323142,
+				lng: 18.0690961,
+				normalPrice: 49,
+				happyHourPrice: 39,
+				happyHourEnd: 18,
+				area: "Gamla Stan",
+				description: "Brittisk pub‑kedja",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "O'Learys Gamla Stan",
+				address: "Stora Nygatan 14",
+				lat: 59.3247551,
+				lng: 18.0682549,
+				normalPrice: 48,
+				happyHourPrice: 38,
+				happyHourEnd: 18,
+				area: "Gamla Stan",
+				description: "Amerikansk sportbar",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Katarina Ölcafé",
+				address: "Katarina Bangata 27",
+				lat: 59.3116867,
+				lng: 18.0793611,
+				normalPrice: 33,
+				happyHourPrice: 25,
+				happyHourEnd: 19,
+				area: "SoFo",
+				description: "Billig kvarterskrog med stammisar",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Blå Dörren",
+				address: "Södermalmstorg 4",
+				lat: 59.320341,
+				lng: 18.0701354,
+				normalPrice: 37,
+				happyHourPrice: 27,
+				happyHourEnd: 19,
+				area: "Slussen",
+				description: "Legendarisk jazzklubb med billig öl",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "WC Bar",
+				address: "Kronobergsgatan 37",
+				lat: 59.3352223,
+				lng: 18.0349241,
+				normalPrice: 35,
+				happyHourPrice: 27,
+				happyHourEnd: 20,
+				area: "Kungsholmen",
+				description: "Toalett‑tema med billig öl",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Slakthuset",
+				address: "Slakthusgatan 10",
+				lat: 59.2909216,
+				lng: 18.0807073,
+				normalPrice: 31,
+				happyHourPrice: 24,
+				happyHourEnd: 21,
+				area: "Johanneshov",
+				description: "Rockbar vid Globen, riktigt billigt!",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Tranan",
+				address: "Karlbergsvägen 14",
+				lat: 59.3431652,
+				lng: 18.0490569,
+				normalPrice: 48,
+				happyHourPrice: 48,
+				happyHourEnd: 24,
+				area: "Vasastan",
+				description: "Klassisk krog med källarbar",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Morfar Ginko",
+				address: "Swedenborgsgatan 13",
+				lat: 59.3156988,
+				lng: 18.0642368,
+				normalPrice: 36,
+				happyHourPrice: 28,
+				happyHourEnd: 19,
+				area: "Mariatorget",
+				description: "Punkbar med schyssta priser",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Pet Sounds Bar",
+				address: "Skånegatan 80",
+				lat: 59.3122067,
+				lng: 18.079725,
+				normalPrice: 44,
+				happyHourPrice: 34,
+				happyHourEnd: 18,
+				area: "SoFo",
+				description: "Musikbar med vinylspelare",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Lådan",
+				address: "Sveavägen 107",
+				lat: 59.3459712,
+				lng: 18.0533715,
+				normalPrice: 32,
+				happyHourPrice: 25,
+				happyHourEnd: 20,
+				area: "Vasastan",
+				description: "Studentkrog med karaoke",
+				openUntil: "02:00"
+			  },
+			  {
+				name: "Häktet",
+				address: "Hornsgatan 82",
+				lat: 59.3180152,
+				lng: 18.054709,
+				normalPrice: 34,
+				happyHourPrice: 26,
+				happyHourEnd: 19,
+				area: "Zinkensdamm",
+				description: "Fängelse‑tema, billig öl",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Eriks Gondolen Bar",
+				address: "Stadsgården 6",
+				lat: 59.3195497,
+				lng: 18.0731606,
+				normalPrice: 38,
+				happyHourPrice: 29,
+				happyHourEnd: 18,
+				area: "Slussen",
+				description: "Vid Gondolen, mycket billigare",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Garlic & Shots",
+				address: "Folkungagatan 84",
+				lat: 59.314863,
+				lng: 18.0794875,
+				normalPrice: 40,
+				happyHourPrice: 30,
+				happyHourEnd: 19,
+				area: "SoFo",
+				description: "Vitlökstema med 101 shots",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Stockholms Ölcafé",
+				address: "Norrtullsgatan 45",
+				lat: 59.3459743,
+				lng: 18.0475577,
+				normalPrice: 38,
+				happyHourPrice: 28,
+				happyHourEnd: 19,
+				area: "Vasastan",
+				description: "Öl‑nördarnas mecka med bra priser",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Tritonia",
+				address: "Scheelegatan 6",
+				lat: 59.3295027,
+				lng: 18.0436141,
+				normalPrice: 30,
+				happyHourPrice: 23,
+				happyHourEnd: 20,
+				area: "Kungsholmen",
+				description: "Studentkrog med Stockholms billigaste happy hour",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Bröderna Olssons",
+				address: "Folkungagatan 84",
+				lat: 59.314863,
+				lng: 18.0794875,
+				normalPrice: 42,
+				happyHourPrice: 32,
+				happyHourEnd: 18,
+				area: "SoFo",
+				description: "Vitlöksfri variant med schyssta priser",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Snotty Seaside",
+				address: "Skeppsbron 2",
+				lat: 59.3262233,
+				lng: 18.07471,
+				normalPrice: 45,
+				happyHourPrice: 35,
+				happyHourEnd: 18,
+				area: "Gamla Stan",
+				description: "Sjömanshak vid vattnet",
+				openUntil: "23:00"
+			  },
+			  {
+				name: "Bysis",
+				address: "Sankt Paulsgatan 13",
+				lat: 59.3181718,
+				lng: 18.0681947,
+				normalPrice: 36,
+				happyHourPrice: 28,
+				happyHourEnd: 19,
+				area: "Mariatorget",
+				description: "Lokal favorit med bra stämning",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Hornhuset",
+				address: "Långholmsgatan 15",
+				lat: 59.3167894,
+				lng: 18.0335524,
+				normalPrice: 35,
+				happyHourPrice: 27,
+				happyHourEnd: 19,
+				area: "Hornstull",
+				description: "Före detta fängelse, nu billig bar",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Bonden Bar",
+				address: "Bondegatan 1",
+				lat: 59.3124046,
+				lng: 18.0752101,
+				normalPrice: 37,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				area: "SoFo",
+				description: "Hörnet med billig öl och bra musik",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Holidays Bar",
+				address: "Götgatan 67",
+				lat: 59.3127418,
+				lng: 18.0743487,
+				normalPrice: 35,
+				happyHourPrice: 35,
+				happyHourEnd: 24,
+				area: "Medborgarplatsen",
+				description: "Rödkaklad klassiker nära Medis – billig öl och kompakt tvåvåningshak",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Baras Gemenskap",
+				address: "Sankt Paulsgatan 2",
+				lat: 59.3186091,
+				lng: 18.0702255,
+				normalPrice: 55,
+				happyHourPrice: 39,
+				happyHourEnd: 19,
+				area: "Mariatorget",
+				description: "Baras‑familjens mysigaste vardagsrum; AW till 19 med lågpris på öl",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Pinocchio Kök & Bar",
+				address: "Östgötagatan 32",
+				lat: 59.313089,
+				lng: 18.0771626,
+				normalPrice: 49,
+				happyHourPrice: 35,
+				happyHourEnd: 19,
+				area: "SoFo",
+				description: "Italienskt kvartershak med prisvärd öl och stadig AW",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Hirschenkeller Hornsgatan",
+				address: "Hornsgatan 136",
+				lat: 59.3164802,
+				lng: 18.0420392,
+				normalPrice: 49,
+				happyHourPrice: 32,
+				happyHourEnd: 18,
+				area: "Hornstull",
+				description: "Hirschenkeller‑klassiker – stor pub med tyska vibbar och bra AW",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Hirschenkeller Götgatsbacken",
+				address: "Götgatan 46",
+				lat: 59.3159503,
+				lng: 18.0723124,
+				normalPrice: 49,
+				happyHourPrice: 32,
+				happyHourEnd: 18,
+				area: "Medborgarplatsen",
+				description: "Budgetvänlig pub mitt i backen; klassisk plankstek + billig öl",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Retro SoFo",
+				address: "Bondegatan 25A",
+				lat: 59.3134266,
+				lng: 18.0827514,
+				normalPrice: 49,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				area: "SoFo",
+				description: "Retro‑kedjans SoFo‑läge – sport på skärmar och AW‑priser",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "The Crib by Retro",
+				address: "Sveavägen 55",
+				lat: 59.3405686,
+				lng: 18.058462,
+				normalPrice: 49,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				area: "Norrmalm",
+				description: "Retros nattöppna lillasyskon – sent öppet och sportbar‑känsla",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Retro Sveavägen",
+				address: "Sveavägen 120",
+				lat: 59.3449516,
+				lng: 18.054976,
+				normalPrice: 49,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				area: "Vasastan",
+				description: "Stor sportbar – vardags‑AW med stor stark under fyrtiolappen",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Pub Kloster",
+				address: "Hornsgatan 84",
+				lat: 59.3179785,
+				lng: 18.0543926,
+				normalPrice: 49,
+				happyHourPrice: 39,
+				happyHourEnd: 18,
+				area: "Zinkensdamm",
+				description: "Dovas gamla lokal – 70+ öl och lågpris‑AW",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "The Laughing Duck",
+				address: "Vasagatan 7",
+				lat: 59.3320958,
+				lng: 18.0576337,
+				normalPrice: 49,
+				happyHourPrice: 39,
+				happyHourEnd: 19,
+				area: "City/Norrmalm",
+				description: "Öppet till 03 varje dag – rejäl pubmat och budgetvänlig AW",
+				openUntil: "03:00"
+			  },
+			  {
+				name: "Bongo Kök & Bar",
+				address: "Birger Jarlsgatan 37",
+				lat: 59.338393,
+				lng: 18.0683078,
+				normalPrice: 49,
+				happyHourPrice: 39,
+				happyHourEnd: 19,
+				area: "Östermalm",
+				description: "Östermalms undantag – öl och bubbel till lågpris, extra deal på fredagar",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Honey Honey",
+				address: "Folkungagatan 59",
+				lat: 59.3146649,
+				lng: 18.0761793,
+				normalPrice: 45,
+				happyHourPrice: 35,
+				happyHourEnd: 19,
+				area: "SoFo",
+				description: "Gemytlig kvarterspub med klassiska rätter och billig bärs",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Parken Söder",
+				address: "Fatbursgatan 1",
+				lat: 59.314623,
+				lng: 18.0668593,
+				normalPrice: 45,
+				happyHourPrice: 35,
+				happyHourEnd: 19,
+				area: "Medborgarplatsen",
+				description: "Billig öl, quiz & standup i klassiska budgethak‑lokaler bakom Medis",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Hirschenkeller Sveavägen",
+				address: "Sveavägen 61",
+				lat: 59.3409828,
+				lng: 18.0580721,
+				normalPrice: 49,
+				happyHourPrice: 32,
+				happyHourEnd: 18,
+				area: "Vasastan",
+				description: "Sedan 1976 – avslappnat häng och tyskinspirerad pubmeny",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Hirschenkeller Fridhemsplan",
+				address: "Sankt Eriksgatan 22",
+				lat: 59.3315742,
+				lng: 18.0311575,
+				normalPrice: 49,
+				happyHourPrice: 32,
+				happyHourEnd: 18,
+				area: "Kungsholmen",
+				description: "Stort ölutbud och stadig AW vid Fridhemsplan",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "International Bar Birkastan",
+				address: "Rörstrandsgatan 11",
+				lat: 59.3399984,
+				lng: 18.0333732,
+				normalPrice: 45,
+				happyHourPrice: 35,
+				happyHourEnd: 18,
+				area: "Vasastan",
+				description: "Prisvärd kvartersbar i Birkastan – enkel pubmat och billig öl",
+				openUntil: "00:00"
+			  },
+			  {
+				name: "Baras Ställe",
+				address: "Götgatan 33",
+				lat: 59.3164402,
+				lng: 18.072287,
+				normalPrice: 55,
+				happyHourPrice: 39,
+				happyHourEnd: 19,
+				area: "Medborgarplatsen",
+				description: "Baras‑koncept med lågpris‑AW; studentlynt publik",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Baras Backe",
+				address: "Götgatan 23",
+				lat: 59.3174985,
+				lng: 18.0717438,
+				normalPrice: 55,
+				happyHourPrice: 39,
+				happyHourEnd: 19,
+				area: "Slussen/Medis",
+				description: "Backen‑läge nära Slussen – samma AW‑deals som övriga Baras",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "Retro Hornstull",
+				address: "Hornsgatan 136",
+				lat: 59.3164802,
+				lng: 18.0420392,
+				normalPrice: 49,
+				happyHourPrice: 29,
+				happyHourEnd: 19,
+				area: "Hornstull",
+				description: "Retro‑sportbar vägg i vägg med Hirschenkeller – samma billiga AW",
+				openUntil: "01:00"
+			  },
+			  {
+				name: "The Central Bar",
+				address: "Götgatan 84",
+				lat: 59.3112967,
+				lng: 18.0744826,
+				normalPrice: 39,
+				happyHourPrice: 39,
+				happyHourEnd: 24,
+				area: "Skanstull/Skrapan",
+				description: "Rakt‑på‑sak kvartershak med låg ölprisnivå hela dagen",
+				openUntil: "01:00"
+			  }
+			];
+
+            // Initialize map
+            const map = L.map('map', {
+                center: [59.325, 18.065],
+                zoom: 12,
+                zoomControl: true,
+                preferCanvas: true
+            });
+            
+            // Add map tiles
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Toggle panel functionality
+            const toggleButton = document.getElementById('togglePanel');
+            const controlPanel = document.getElementById('controlPanel');
+            
+            toggleButton.addEventListener('click', function() {
+                controlPanel.classList.toggle('open');
+                toggleButton.classList.toggle('panel-open');
+            });
+
+            // Current settings
+            let currentTime = 17;
+            let currentDay = 'wed';
+            let markers = [];
+            let activeFilters = {
+                '0-30': true,
+                '30-40': true,
+                '40-50': true,
+                '50-999': true
+            };
+
+            // Get price color
+            function getPriceColor(price) {
+                if (price < 30) return '#2ecc71';
+                if (price < 40) return '#f1c40f';
+                if (price < 50) return '#e67e22';
+                return '#e74c3c';
+            }
+
+            // Check if happy hour is active
+            function isHappyHour(bar, time, day) {
+                if (bar.happyHourDays && !bar.happyHourDays.includes(day)) {
+                    return false;
+                }
+                
+                const startTime = bar.happyHourStart || 13;
+                const endTime = bar.happyHourEnd;
+                
+                if (endTime === 24) return true;
+                
+                // Handle times after midnight
+                const adjustedTime = time > 24 ? time - 24 : time;
+                
+                if (endTime < startTime) {
+                    return adjustedTime >= startTime || adjustedTime < endTime;
+                } else {
+                    return adjustedTime >= startTime && adjustedTime < endTime;
+                }
+            }
+
+            // Get current price
+            function getCurrentPrice(bar, time, day) {
+                return isHappyHour(bar, time, day) ? bar.happyHourPrice : bar.normalPrice;
+            }
+
+            // Create custom icon
+            function createIcon(price) {
+                const color = getPriceColor(price);
+                const iconHtml = `
+                    <div style="
+                        background: linear-gradient(135deg, ${color}, ${color}dd);
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: 3px solid white;
+                        box-shadow: 0 3px 15px rgba(0,0,0,0.5);
+                        font-weight: bold;
+                        color: white;
+                        font-size: 14px;
+                        position: relative;
+                    ">
+                        <span style="text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">${price}</span>
+                    </div>
+                `;
+                
+                return L.divIcon({
+                    className: 'custom-div-icon',
+                    html: iconHtml,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18],
+                    popupAnchor: [0, -18]
+                });
+            }
+
+            // Format time display
+            function formatTime(time) {
+                const adjustedTime = time > 24 ? time - 24 : time;
+                const hours = Math.floor(adjustedTime);
+                const minutes = time % 1 === 0.5 ? '30' : '00';
+                return `${hours.toString().padStart(2, '0')}:${minutes}`;
+            }
+
+            // Check if price is within active filters
+            function isPriceInActiveFilters(price) {
+                if (price < 30 && activeFilters['0-30']) return true;
+                if (price >= 30 && price < 40 && activeFilters['30-40']) return true;
+                if (price >= 40 && price < 50 && activeFilters['40-50']) return true;
+                if (price >= 50 && activeFilters['50-999']) return true;
+                return false;
+            }
+
+            // Update all markers
+            function updateMarkers() {
+                // Clear existing markers
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+
+                let happyHourCount = 0;
+                let cheapestPrice = 999;
+                let cheapestBarName = '';
+                let under30Count = 0;
+                let visibleBarCount = 0;
+
+                bars.forEach(bar => {
+                    const currentPrice = getCurrentPrice(bar, currentTime, currentDay);
+                    const isHappy = isHappyHour(bar, currentTime, currentDay);
+                    
+                    // Check if bar should be visible based on filters
+                    if (!isPriceInActiveFilters(currentPrice)) {
+                        return; // Skip this bar if it doesn't match active filters
+                    }
+                    
+                    visibleBarCount++;
+                    
+                    if (isHappy && bar.happyHourPrice < bar.normalPrice) {
+                        happyHourCount++;
+                    }
+
+                    if (currentPrice < 30) {
+                        under30Count++;
+                    }
+
+                    if (currentPrice < cheapestPrice) {
+                        cheapestPrice = currentPrice;
+                        cheapestBarName = bar.name;
+                    }
+
+                    // Create marker
+                    const marker = L.marker([bar.lat, bar.lng], {
+                        icon: createIcon(currentPrice),
+                        riseOnHover: true
+                    }).addTo(map);
+
+                    // Create popup content
+                    let popupContent = `
+                        <div class="popup-content">
+                            <div class="popup-title">${bar.name}</div>
+                            <div class="popup-price" style="color: ${getPriceColor(currentPrice)};">
+                                ${currentPrice} kr
+                            </div>
+                            <div class="popup-info">📍 ${bar.address}</div>
+                            <div class="popup-info">🏛️ ${bar.area}</div>
+                            <div class="popup-info">🕐 Öppet till ${bar.openUntil}</div>
+                            <div class="popup-info" style="font-style: italic;">${bar.description}</div>
+                    `;
+
+                    if (isHappy && bar.happyHourPrice < bar.normalPrice) {
+                        popupContent += `<div class="popup-happy">🎉 Happy Hour aktiv!</div>`;
+                    }
+
+                    popupContent += '</div>';
+
+                    marker.bindPopup(popupContent, {
+                        maxWidth: 300,
+                        className: 'custom-popup'
+                    });
+                    
+                    markers.push(marker);
+                });
+
+                // Update stats
+                document.getElementById('barCount').textContent = `${visibleBarCount}/${bars.length}`;
+                document.getElementById('happyCount').textContent = happyHourCount;
+                document.getElementById('cheapest').textContent = cheapestPrice < 999 ? `${cheapestPrice} kr` : '-';
+                document.getElementById('cheapestBar').textContent = cheapestBarName || '-';
+                document.getElementById('under30Count').textContent = under30Count;
+
+                // Update happy hour badge
+                const badge = document.getElementById('happyBadge');
+                const happyNumber = document.getElementById('happyNumber');
+                if (happyHourCount > 5) {
+                    badge.style.display = 'block';
+                    happyNumber.textContent = happyHourCount;
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+
+            // Time slider event listener
+            const timeSlider = document.getElementById('timeSlider');
+            const timeDisplay = document.getElementById('timeDisplay');
+            
+            timeSlider.addEventListener('input', function(e) {
+                currentTime = parseFloat(e.target.value);
+                timeDisplay.textContent = formatTime(currentTime);
+                updateMarkers();
+            });
+
+            // Day selector event listeners
+            document.querySelectorAll('.day-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentDay = this.dataset.day;
+                    updateMarkers();
+                });
+            });
+
+            // Initial load
+            updateMarkers();
+
+            // Filter event listeners
+            document.querySelectorAll('.legend-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    // Don't toggle if clicking on checkbox directly
+                    if (e.target.classList.contains('filter-checkbox')) {
+                        return;
+                    }
+                    
+                    const checkbox = this.querySelector('.filter-checkbox');
+                    checkbox.checked = !checkbox.checked;
+                    
+                    // Update active filters
+                    const min = parseInt(this.dataset.min);
+                    const max = parseInt(this.dataset.max);
+                    const filterKey = `${min}-${max}`;
+                    activeFilters[filterKey] = checkbox.checked;
+                    
+                    // Update visual state
+                    if (checkbox.checked) {
+                        this.classList.add('active');
+                        this.classList.remove('inactive');
+                    } else {
+                        this.classList.remove('active');
+                        this.classList.add('inactive');
+                    }
+                    
+                    updateMarkers();
+                });
+                
+                // Handle checkbox change directly
+                const checkbox = item.querySelector('.filter-checkbox');
+                checkbox.addEventListener('change', function(e) {
+                    e.stopPropagation();
+                    
+                    const parent = this.closest('.legend-item');
+                    const min = parseInt(parent.dataset.min);
+                    const max = parseInt(parent.dataset.max);
+                    const filterKey = `${min}-${max}`;
+                    activeFilters[filterKey] = this.checked;
+                    
+                    // Update visual state
+                    if (this.checked) {
+                        parent.classList.add('active');
+                        parent.classList.remove('inactive');
+                    } else {
+                        parent.classList.remove('active');
+                        parent.classList.add('inactive');
+                    }
+                    
+                    updateMarkers();
+                });
+            });
+
+            // Select All button
+            document.getElementById('selectAll').addEventListener('click', function() {
+                activeFilters = {
+                    '0-30': true,
+                    '30-40': true,
+                    '40-50': true,
+                    '50-999': true
+                };
+                
+                document.querySelectorAll('.legend-item').forEach(item => {
+                    item.classList.add('active');
+                    item.classList.remove('inactive');
+                    item.querySelector('.filter-checkbox').checked = true;
+                });
+                
+                updateMarkers();
+            });
+
+            // Clear All button
+            document.getElementById('clearAll').addEventListener('click', function() {
+                activeFilters = {
+                    '0-30': false,
+                    '30-40': false,
+                    '40-50': false,
+                    '50-999': false
+                };
+                
+                document.querySelectorAll('.legend-item').forEach(item => {
+                    item.classList.remove('active');
+                    item.classList.add('inactive');
+                    item.querySelector('.filter-checkbox').checked = false;
+                });
+                
+                updateMarkers();
+            });
+
+            // Budget Only button (under 40 kr)
+            document.getElementById('budgetOnly').addEventListener('click', function() {
+                activeFilters = {
+                    '0-30': true,
+                    '30-40': true,
+                    '40-50': false,
+                    '50-999': false
+                };
+                
+                document.querySelectorAll('.legend-item').forEach(item => {
+                    const min = parseInt(item.dataset.min);
+                    const checkbox = item.querySelector('.filter-checkbox');
+                    
+                    if (min < 40) {
+                        item.classList.add('active');
+                        item.classList.remove('inactive');
+                        checkbox.checked = true;
+                    } else {
+                        item.classList.remove('active');
+                        item.classList.add('inactive');
+                        checkbox.checked = false;
+                    }
+                });
+                
+                updateMarkers();
+            });
+        }
+    </script>
+</body>
+</html>
