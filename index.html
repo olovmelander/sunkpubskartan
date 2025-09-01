@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stockholm Sunkpubskarta - Hitta billig öl</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <style>
         * {
             margin: 0;
@@ -570,6 +571,77 @@
                 padding: 10px 15px;
             }
         }
+
+        .pub-roulette {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .pub-roulette h3 {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: #FFD700;
+            text-align: center;
+        }
+
+        .distance-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            opacity: 0.7;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+        }
+
+        .distance-slider:hover {
+            opacity: 1;
+        }
+
+        .distance-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+        }
+
+        .distance-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+        }
+
+        .distance-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            color: #999;
+        }
+
+        .distance-display {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+
+        #playRouletteBtn {
+            margin-top: 15px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-weight: 700;
+        }
     </style>
 </head>
 <body>
@@ -650,6 +722,20 @@
         <div class="stats">
             <div class="stat-item">
                 <button class="filter-btn" id="findMeBtn" style="width: 100%;">Hitta mig</button>
+            </div>
+            <div class="pub-roulette">
+                <h3>Pub Roulette</h3>
+                <div class="slider-container">
+                    <input type="range" class="distance-slider" id="distanceSlider" min="100" max="2000" value="1000" step="100">
+                    <div class="distance-labels">
+                        <span>100m</span>
+                        <span>2000m</span>
+                    </div>
+                </div>
+                <div class="distance-display">
+                    Max avstånd: <span id="distanceValue">1000</span>m
+                </div>
+                <button class="filter-btn" id="playRouletteBtn" style="width: 100%;">Spela</button>
             </div>
             <div class="stat-item">
                 <span class="stat-label">🔍 Visar barer:</span>
@@ -1995,6 +2081,63 @@
 
             // Geolocation
             let userMarker = null;
+            let userPosition = null;
+            let radiusCircle = null;
+            let routingControl = null;
+
+            const distanceSlider = document.getElementById('distanceSlider');
+            const distanceValue = document.getElementById('distanceValue');
+            const playRouletteBtn = document.getElementById('playRouletteBtn');
+
+            distanceSlider.addEventListener('input', (e) => {
+                const distance = e.target.value;
+                distanceValue.textContent = distance;
+                if (userPosition) {
+                    drawRadiusCircle(userPosition, distance);
+                }
+            });
+
+            playRouletteBtn.addEventListener('click', () => {
+                if (!userPosition) {
+                    alert('Please find your location first using the "Hitta mig" button.');
+                    return;
+                }
+
+                const distance = distanceSlider.value;
+                const nearbyBars = bars.filter(bar => {
+                    const barLatLng = L.latLng(bar.lat, bar.lng);
+                    const userLatLng = L.latLng(userPosition.lat, userPosition.lng);
+                    return userLatLng.distanceTo(barLatLng) <= distance;
+                });
+
+                if (nearbyBars.length === 0) {
+                    alert('No pubs found within the selected distance. Try increasing the radius.');
+                    return;
+                }
+
+                const randomBar = nearbyBars[Math.floor(Math.random() * nearbyBars.length)];
+
+                if (routingControl) {
+                    map.removeControl(routingControl);
+                }
+
+                routingControl = L.routing.control({
+                    waypoints: [
+                        L.latLng(userPosition.lat, userPosition.lng),
+                        L.latLng(randomBar.lat, randomBar.lng)
+                    ],
+                    routeWhileDragging: true,
+                    show: false,
+                    createMarker: function() { return null; }
+                }).addTo(map);
+
+                map.flyTo([randomBar.lat, randomBar.lng], 15);
+                const marker = markers.find(m => m.getLatLng().lat === randomBar.lat && m.getLatLng().lng === randomBar.lng);
+                if(marker) {
+                    marker.openPopup();
+                }
+            });
+
             document.getElementById('findMeBtn').addEventListener('click', function() {
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(showPosition, showError);
@@ -2031,9 +2174,22 @@
                 });
             }
 
+            function drawRadiusCircle(position, distance) {
+                if (radiusCircle) {
+                    map.removeLayer(radiusCircle);
+                }
+                radiusCircle = L.circle([position.lat, position.lng], {
+                    radius: distance,
+                    color: '#FFD700',
+                    fillColor: '#FFD700',
+                    fillOpacity: 0.1
+                }).addTo(map);
+            }
+
             function showPosition(position) {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
+                userPosition = { lat, lng };
 
                 if(userMarker) {
                     map.removeLayer(userMarker);
@@ -2043,6 +2199,7 @@
                     .bindPopup("<b>Your Location</b>").openPopup();
 
                 map.setView([lat, lng], 14);
+                drawRadiusCircle(userPosition, distanceSlider.value);
             }
 
             function showError(error) {
@@ -2063,5 +2220,6 @@
             }
         }
     </script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 </body>
 </html>
