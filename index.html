@@ -649,6 +649,9 @@
 
         <div class="stats">
             <div class="stat-item">
+                <button class="filter-btn" id="findMeBtn" style="width: 100%;">Hitta mig</button>
+            </div>
+            <div class="stat-item">
                 <span class="stat-label">🔍 Visar barer:</span>
                 <span class="stat-value" id="barCount">0</span>
             </div>
@@ -1989,6 +1992,75 @@
                 
                 updateMarkers();
             });
+
+            // Geolocation
+            let userMarker = null;
+            document.getElementById('findMeBtn').addEventListener('click', function() {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(showPosition, showError);
+                } else {
+                    alert("Geolocation is not supported by this browser.");
+                }
+            });
+
+            function createUserIcon() {
+                const iconHtml = `
+                    <div style="
+                        background: linear-gradient(135deg, #007bff, #0056b3);
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: 3px solid white;
+                        box-shadow: 0 3px 15px rgba(0,0,0,0.5);
+                        font-weight: bold;
+                        color: white;
+                        font-size: 20px;
+                    ">
+                        ★
+                    </div>
+                `;
+                return L.divIcon({
+                    className: 'user-location-icon',
+                    html: iconHtml,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18],
+                    popupAnchor: [0, -18]
+                });
+            }
+
+            function showPosition(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                if(userMarker) {
+                    map.removeLayer(userMarker);
+                }
+
+                userMarker = L.marker([lat, lng], { icon: createUserIcon() }).addTo(map)
+                    .bindPopup("<b>Your Location</b>").openPopup();
+
+                map.setView([lat, lng], 14);
+            }
+
+            function showError(error) {
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        alert("User denied the request for Geolocation.");
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        alert("Location information is unavailable.");
+                        break;
+                    case error.TIMEOUT:
+                        alert("The request to get user location timed out.");
+                        break;
+                    case error.UNKNOWN_ERROR:
+                        alert("An unknown error occurred.");
+                        break;
+                }
+            }
         }
     </script>
 </body>
