@@ -510,7 +510,8 @@
         .happy-hour-badge {
             position: fixed;
             top: 20px;
-            left: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             background: linear-gradient(135deg, #FFD700, #FFA500);
             color: #000;
             padding: 15px 25px;
@@ -524,10 +525,10 @@
 
         @keyframes bounce {
             0%, 100% {
-                transform: translateY(0);
+                transform: translateX(-50%) translateY(0);
             }
             50% {
-                transform: translateY(-10px);
+                transform: translateX(-50%) translateY(-10px);
             }
         }
 
@@ -564,7 +565,7 @@
 
             .happy-hour-badge {
                 top: 70px;
-                left: 10px;
+                left: 50%;
                 font-size: 0.9em;
                 padding: 10px 15px;
             }
