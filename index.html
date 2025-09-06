@@ -764,10 +764,6 @@
         </div>
     </div>
 
-    <div class="happy-hour-badge" id="happyBadge" style="display: none;">
-        🎊 Happy Hour på <span id="happyNumber">0</span> ställen!
-    </div>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script>
@@ -2012,15 +2008,6 @@
                 document.getElementById('cheapestBar').textContent = cheapestBarName || '-';
                 document.getElementById('under30Count').textContent = under30Count;
 
-                // Update happy hour badge
-                const badge = document.getElementById('happyBadge');
-                const happyNumber = document.getElementById('happyNumber');
-                if (happyHourCount > 5) {
-                    badge.style.display = 'block';
-                    happyNumber.textContent = happyHourCount;
-                } else {
-                    badge.style.display = 'none';
-                }
             }
 
             // Time slider event listener
