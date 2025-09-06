@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stockholm Sunkpubskarta - Hitta billig öl</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <style>
         * {
@@ -253,10 +254,10 @@
             width: 100%;
             height: 8px;
             border-radius: 10px;
-            background: linear-gradient(90deg, 
-                #2ecc71 0%, 
-                #f1c40f 30%, 
-                #e67e22 70%, 
+            background: linear-gradient(90deg,
+                #2ecc71 0%,
+                #f1c40f 30%,
+                #e67e22 70%,
                 #e74c3c 100%);
             outline: none;
             appearance: none;
@@ -646,7 +647,7 @@
 </head>
 <body>
     <div id="map"></div>
-    
+
     <button class="toggle-button" id="togglePanel">
         <div class="hamburger">
             <span></span>
@@ -654,7 +655,7 @@
             <span></span>
         </div>
     </button>
-    
+
     <div class="control-panel" id="controlPanel">
         <div class="header">
             <span class="beer-icon">🍺</span>
@@ -668,7 +669,7 @@
             <div class="time-display">
                 <div class="current-time" id="timeDisplay">17:00</div>
             </div>
-            
+
             <div class="day-selector">
                 <button class="day-btn" data-day="mon">Mån</button>
                 <button class="day-btn" data-day="tue">Tis</button>
@@ -678,7 +679,7 @@
                 <button class="day-btn" data-day="sat">Lör</button>
                 <button class="day-btn" data-day="sun">Sön</button>
             </div>
-            
+
             <div class="slider-container">
                 <input type="range" class="time-slider" id="timeSlider" min="12" max="27" value="17" step="0.5">
                 <div class="time-labels">
@@ -738,6 +739,9 @@
                 <button class="filter-btn" id="playRouletteBtn" style="width: 100%;">Spela</button>
             </div>
             <div class="stat-item">
+                <button class="filter-btn" id="clearDrawingBtn" style="width: 100%;">Rensa ritat område</button>
+            </div>
+            <div class="stat-item">
                 <span class="stat-label">🔍 Visar barer:</span>
                 <span class="stat-value" id="barCount">0</span>
             </div>
@@ -765,6 +769,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script>
         // Wait for DOM and Leaflet to load
         window.addEventListener('DOMContentLoaded', function() {
@@ -778,7 +783,7 @@
                 }, 1000);
             }
         });
-        
+
         function initializeMap() {
             // Bar data - all 60 bars
             const bars = [
@@ -1743,17 +1748,68 @@
                 zoomControl: true,
                 preferCanvas: true
             });
-            
+
             // Add map tiles
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors',
                 maxZoom: 19
             }).addTo(map);
 
+            var drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+
+            var drawControl = new L.Control.Draw({
+                edit: {
+                    featureGroup: drawnItems,
+                    remove: true
+                },
+                draw: {
+                    polygon: {
+                        allowIntersection: false,
+                        showArea: true
+                    },
+                    polyline: false,
+                    rectangle: false,
+                    circle: false,
+                    marker: false,
+                    circlemarker: false
+                }
+            });
+            map.addControl(drawControl);
+
+            let drawnShape = null;
+
+            function clearDrawing() {
+                drawnItems.clearLayers();
+                drawnShape = null;
+                updateMarkers();
+            }
+
+            map.on(L.Draw.Event.CREATED, function (e) {
+                var layer = e.layer;
+                drawnItems.clearLayers();
+                drawnItems.addLayer(layer);
+                drawnShape = layer;
+                updateMarkers();
+            });
+
+            map.on(L.Draw.Event.EDITED, function (e) {
+                e.layers.eachLayer(function (layer) {
+                    drawnShape = layer;
+                });
+                updateMarkers();
+            });
+
+            map.on(L.Draw.Event.DELETED, function () {
+                clearDrawing();
+            });
+
+            document.getElementById('clearDrawingBtn').addEventListener('click', clearDrawing);
+
             // Toggle panel functionality
             const toggleButton = document.getElementById('togglePanel');
             const controlPanel = document.getElementById('controlPanel');
-            
+
             toggleButton.addEventListener('click', function() {
                 controlPanel.classList.toggle('open');
                 toggleButton.classList.toggle('panel-open');
@@ -1763,6 +1819,7 @@
             let currentTime = 17;
             let currentDay = 'wed';
             let markers = [];
+            let visibleBars = [];
             let activeFilters = {
                 '0-30': true,
                 '30-40': true,
@@ -1783,15 +1840,15 @@
                 if (bar.happyHourDays && !bar.happyHourDays.includes(day)) {
                     return false;
                 }
-                
+
                 const startTime = bar.happyHourStart || 13;
                 const endTime = bar.happyHourEnd;
-                
+
                 if (endTime === 24) return true;
-                
+
                 // Handle times after midnight
                 const adjustedTime = time > 24 ? time - 24 : time;
-                
+
                 if (endTime < startTime) {
                     return adjustedTime >= startTime || adjustedTime < endTime;
                 } else {
@@ -1826,7 +1883,7 @@
                         <span style="text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">${price}</span>
                     </div>
                 `;
-                
+
                 return L.divIcon({
                     className: 'custom-div-icon',
                     html: iconHtml,
@@ -1853,6 +1910,23 @@
                 return false;
             }
 
+            function isMarkerInsidePolygon(marker, poly) {
+                var polyPoints = poly.getLatLngs()[0];
+                var x = marker.getLatLng().lat, y = marker.getLatLng().lng;
+
+                var inside = false;
+                for (var i = 0, j = polyPoints.length - 1; i < polyPoints.length; j = i++) {
+                    var xi = polyPoints[i].lat, yi = polyPoints[i].lng;
+                    var xj = polyPoints[j].lat, yj = polyPoints[j].lng;
+
+                    var intersect = ((yi > y) != (yj > y))
+                        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+
+                return inside;
+            }
+
             // Update all markers
             function updateMarkers() {
                 // Clear existing markers
@@ -1863,19 +1937,28 @@
                 let cheapestPrice = 999;
                 let cheapestBarName = '';
                 let under30Count = 0;
-                let visibleBarCount = 0;
 
-                bars.forEach(bar => {
+                visibleBars = bars.filter(bar => {
+                    const currentPrice = getCurrentPrice(bar, currentTime, currentDay);
+                    if (!isPriceInActiveFilters(currentPrice)) {
+                        return false;
+                    }
+
+                    if (drawnShape) {
+                        const marker = L.marker([bar.lat, bar.lng]);
+                        if (!isMarkerInsidePolygon(marker, drawnShape)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+
+                let visibleBarCount = visibleBars.length;
+
+                visibleBars.forEach(bar => {
                     const currentPrice = getCurrentPrice(bar, currentTime, currentDay);
                     const isHappy = isHappyHour(bar, currentTime, currentDay);
-                    
-                    // Check if bar should be visible based on filters
-                    if (!isPriceInActiveFilters(currentPrice)) {
-                        return; // Skip this bar if it doesn't match active filters
-                    }
-                    
-                    visibleBarCount++;
-                    
+
                     if (isHappy && bar.happyHourPrice < bar.normalPrice) {
                         happyHourCount++;
                     }
@@ -1918,7 +2001,7 @@
                         maxWidth: 300,
                         className: 'custom-popup'
                     });
-                    
+
                     markers.push(marker);
                 });
 
@@ -1943,7 +2026,7 @@
             // Time slider event listener
             const timeSlider = document.getElementById('timeSlider');
             const timeDisplay = document.getElementById('timeDisplay');
-            
+
             timeSlider.addEventListener('input', function(e) {
                 currentTime = parseFloat(e.target.value);
                 timeDisplay.textContent = formatTime(currentTime);
@@ -1970,16 +2053,16 @@
                     if (e.target.classList.contains('filter-checkbox')) {
                         return;
                     }
-                    
+
                     const checkbox = this.querySelector('.filter-checkbox');
                     checkbox.checked = !checkbox.checked;
-                    
+
                     // Update active filters
                     const min = parseInt(this.dataset.min);
                     const max = parseInt(this.dataset.max);
                     const filterKey = `${min}-${max}`;
                     activeFilters[filterKey] = checkbox.checked;
-                    
+
                     // Update visual state
                     if (checkbox.checked) {
                         this.classList.add('active');
@@ -1988,21 +2071,21 @@
                         this.classList.remove('active');
                         this.classList.add('inactive');
                     }
-                    
+
                     updateMarkers();
                 });
-                
+
                 // Handle checkbox change directly
                 const checkbox = item.querySelector('.filter-checkbox');
                 checkbox.addEventListener('change', function(e) {
                     e.stopPropagation();
-                    
+
                     const parent = this.closest('.legend-item');
                     const min = parseInt(parent.dataset.min);
                     const max = parseInt(parent.dataset.max);
                     const filterKey = `${min}-${max}`;
                     activeFilters[filterKey] = this.checked;
-                    
+
                     // Update visual state
                     if (this.checked) {
                         parent.classList.add('active');
@@ -2011,7 +2094,7 @@
                         parent.classList.remove('active');
                         parent.classList.add('inactive');
                     }
-                    
+
                     updateMarkers();
                 });
             });
@@ -2024,13 +2107,13 @@
                     '40-50': true,
                     '50-999': true
                 };
-                
+
                 document.querySelectorAll('.legend-item').forEach(item => {
                     item.classList.add('active');
                     item.classList.remove('inactive');
                     item.querySelector('.filter-checkbox').checked = true;
                 });
-                
+
                 updateMarkers();
             });
 
@@ -2042,13 +2125,13 @@
                     '40-50': false,
                     '50-999': false
                 };
-                
+
                 document.querySelectorAll('.legend-item').forEach(item => {
                     item.classList.remove('active');
                     item.classList.add('inactive');
                     item.querySelector('.filter-checkbox').checked = false;
                 });
-                
+
                 updateMarkers();
             });
 
@@ -2060,11 +2143,11 @@
                     '40-50': false,
                     '50-999': false
                 };
-                
+
                 document.querySelectorAll('.legend-item').forEach(item => {
                     const min = parseInt(item.dataset.min);
                     const checkbox = item.querySelector('.filter-checkbox');
-                    
+
                     if (min < 40) {
                         item.classList.add('active');
                         item.classList.remove('inactive');
@@ -2075,7 +2158,7 @@
                         checkbox.checked = false;
                     }
                 });
-                
+
                 updateMarkers();
             });
 
@@ -2104,14 +2187,14 @@
                 }
 
                 const distance = distanceSlider.value;
-                const nearbyBars = bars.filter(bar => {
+                const nearbyBars = visibleBars.filter(bar => {
                     const barLatLng = L.latLng(bar.lat, bar.lng);
                     const userLatLng = L.latLng(userPosition.lat, userPosition.lng);
                     return userLatLng.distanceTo(barLatLng) <= distance;
                 });
 
                 if (nearbyBars.length === 0) {
-                    alert('No pubs found within the selected distance. Try increasing the radius.');
+                    alert('No pubs found within the selected distance and filters. Try increasing the radius or changing filters.');
                     return;
                 }
 
