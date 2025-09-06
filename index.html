@@ -693,14 +693,9 @@
 
         <div class="legend">
             <h3>🎨 Prisnivåer - Klicka för att filtrera</h3>
-            <div class="legend-item active" data-min="0" data-max="30">
+            <div class="legend-item active" data-min="0" data-max="40">
                 <div class="legend-color" style="background: linear-gradient(135deg, #2ecc71, #27ae60);"></div>
-                <span><strong>&lt; 30 kr</strong> - Riktigt billigt! 🎉</span>
-                <input type="checkbox" class="filter-checkbox" checked>
-            </div>
-            <div class="legend-item active" data-min="30" data-max="40">
-                <div class="legend-color" style="background: linear-gradient(135deg, #f1c40f, #f39c12);"></div>
-                <span><strong>30-40 kr</strong> - Bra pris 👍</span>
+                <span><strong>&lt; 40 kr</strong> - Bra pris 👍</span>
                 <input type="checkbox" class="filter-checkbox" checked>
             </div>
             <div class="legend-item active" data-min="40" data-max="50">
@@ -758,8 +753,8 @@
                 <span class="stat-value" id="cheapestBar" style="font-size: 0.9em;">-</span>
             </div>
             <div class="stat-item" style="background: linear-gradient(135deg, #2ecc71, #27ae60); color: white;">
-                <span class="stat-label">🍺 Under 30 kr (synliga):</span>
-                <span class="stat-value" id="under30Count" style="color: white;">0</span>
+                <span class="stat-label">🍺 Under 40 kr (synliga):</span>
+                <span class="stat-value" id="under40Count" style="color: white;">0</span>
             </div>
         </div>
     </div>
@@ -1905,18 +1900,16 @@
             let markers = [];
             let visibleBars = [];
             let activeFilters = {
-                '0-30': true,
-                '30-40': true,
+                '0-40': true,
                 '40-50': true,
                 '50-999': true
             };
 
             // Get price color
             function getPriceColor(price) {
-                if (price < 30) return '#2ecc71';
-                if (price < 40) return '#f1c40f';
-                if (price < 50) return '#e67e22';
-                return '#e74c3c';
+                if (price < 40) return '#2ecc71'; // green
+                if (price <= 50) return '#e67e22'; // orange
+                return '#e74c3c'; // red
             }
 
             // Check if happy hour is active
@@ -1987,10 +1980,9 @@
 
             // Check if price is within active filters
             function isPriceInActiveFilters(price) {
-                if (price < 30 && activeFilters['0-30']) return true;
-                if (price >= 30 && price < 40 && activeFilters['30-40']) return true;
-                if (price >= 40 && price < 50 && activeFilters['40-50']) return true;
-                if (price >= 50 && activeFilters['50-999']) return true;
+                if (price < 40 && activeFilters['0-40']) return true;
+                if (price >= 40 && price <= 50 && activeFilters['40-50']) return true;
+                if (price > 50 && activeFilters['50-999']) return true;
                 return false;
             }
 
@@ -2020,7 +2012,7 @@
                 let happyHourCount = 0;
                 let cheapestPrice = 999;
                 let cheapestBarName = '';
-                let under30Count = 0;
+                let under40Count = 0;
 
                 visibleBars = bars.filter(bar => {
                     const currentPrice = getCurrentPrice(bar, currentTime, currentDay);
@@ -2047,8 +2039,8 @@
                         happyHourCount++;
                     }
 
-                    if (currentPrice < 30) {
-                        under30Count++;
+                    if (currentPrice < 40) {
+                        under40Count++;
                     }
 
                     if (currentPrice < cheapestPrice) {
@@ -2094,7 +2086,7 @@
                 document.getElementById('happyCount').textContent = happyHourCount;
                 document.getElementById('cheapest').textContent = cheapestPrice < 999 ? `${cheapestPrice} kr` : '-';
                 document.getElementById('cheapestBar').textContent = cheapestBarName || '-';
-                document.getElementById('under30Count').textContent = under30Count;
+                document.getElementById('under40Count').textContent = under40Count;
 
             }
 
@@ -2182,8 +2174,7 @@
             // Select All button
             document.getElementById('selectAll').addEventListener('click', function() {
                 activeFilters = {
-                    '0-30': true,
-                    '30-40': true,
+                    '0-40': true,
                     '40-50': true,
                     '50-999': true
                 };
@@ -2200,8 +2191,7 @@
             // Clear All button
             document.getElementById('clearAll').addEventListener('click', function() {
                 activeFilters = {
-                    '0-30': false,
-                    '30-40': false,
+                    '0-40': false,
                     '40-50': false,
                     '50-999': false
                 };
@@ -2218,8 +2208,7 @@
             // Budget Only button (under 40 kr)
             document.getElementById('budgetOnly').addEventListener('click', function() {
                 activeFilters = {
-                    '0-30': true,
-                    '30-40': true,
+                    '0-40': true,
                     '40-50': false,
                     '50-999': false
                 };
