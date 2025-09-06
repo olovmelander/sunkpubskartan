@@ -2138,13 +2138,18 @@
                 }
             });
 
-            document.getElementById('findMeBtn').addEventListener('click', function() {
+            function findUserLocation() {
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(showPosition, showError);
                 } else {
                     alert("Geolocation is not supported by this browser.");
                 }
-            });
+            }
+
+            document.getElementById('findMeBtn').addEventListener('click', findUserLocation);
+
+            // Automatically find user's location on page load
+            findUserLocation();
 
             function createUserIcon() {
                 const iconHtml = `
