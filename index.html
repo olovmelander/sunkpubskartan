@@ -1824,7 +1824,7 @@
                 hours += 24;
             }
 
-            let currentTime = Math.round((hours + minutes / 60) * 2) / 2;
+            let currentTime = Math.floor((hours + minutes / 60) * 2) / 2;
 
             // Clamp to slider range
             if (currentTime < 12) currentTime = 12;
