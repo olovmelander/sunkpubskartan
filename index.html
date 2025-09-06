@@ -673,7 +673,7 @@
             <div class="day-selector">
                 <button class="day-btn" data-day="mon">Mån</button>
                 <button class="day-btn" data-day="tue">Tis</button>
-                <button class="day-btn active" data-day="wed">Ons</button>
+                <button class="day-btn" data-day="wed">Ons</button>
                 <button class="day-btn" data-day="thu">Tor</button>
                 <button class="day-btn" data-day="fri">Fre</button>
                 <button class="day-btn" data-day="sat">Lör</button>
@@ -1812,8 +1812,24 @@
             });
 
             // Current settings
-            let currentTime = 17;
-            let currentDay = 'wed';
+            const now = new Date();
+            const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+            let currentDay = dayMap[now.getDay()];
+
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+
+            // Handle times after midnight for the slider's 24-27 range
+            if (hours < 3) {
+                hours += 24;
+            }
+
+            let currentTime = Math.round((hours + minutes / 60) * 2) / 2;
+
+            // Clamp to slider range
+            if (currentTime < 12) currentTime = 12;
+            if (currentTime > 27) currentTime = 27;
+
             let markers = [];
             let visibleBars = [];
             let activeFilters = {
@@ -2013,6 +2029,11 @@
             // Time slider event listener
             const timeSlider = document.getElementById('timeSlider');
             const timeDisplay = document.getElementById('timeDisplay');
+
+            // Set initial UI state based on current time
+            timeSlider.value = currentTime;
+            timeDisplay.textContent = formatTime(currentTime);
+            document.querySelector(`.day-btn[data-day="${currentDay}"]`).classList.add('active');
 
             timeSlider.addEventListener('input', function(e) {
                 currentTime = parseFloat(e.target.value);
