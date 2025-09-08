@@ -715,6 +715,10 @@
             </div>
         </div>
 
+        <div class="legend" id="areaLegend">
+            <h3>🗺️ Områden</h3>
+        </div>
+
         <div class="stats">
             <div class="stat-item">
                 <button class="filter-btn" id="findMeBtn" style="width: 100%;">Hitta mig</button>
@@ -1895,6 +1899,59 @@
                 '50-999': true
             };
 
+            let activeAreaFilters = {};
+
+            // Get unique areas
+            const uniqueAreas = [...new Set(bars.map(bar => bar.area))].sort();
+
+            function populateAreaFilters() {
+                const areaLegend = document.getElementById('areaLegend');
+
+                uniqueAreas.forEach(area => {
+                    activeAreaFilters[area] = true; // Initially, all areas are active
+
+                    const item = document.createElement('div');
+                    item.classList.add('legend-item', 'active');
+                    item.dataset.area = area;
+
+                    const colorBox = document.createElement('div');
+                    colorBox.classList.add('legend-color');
+                    colorBox.style.backgroundColor = 'transparent'; // No color needed for areas
+
+                    const label = document.createElement('span');
+                    label.textContent = area;
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.classList.add('filter-checkbox');
+                    checkbox.checked = true;
+                    checkbox.dataset.area = area;
+
+                    item.appendChild(label);
+                    item.appendChild(checkbox);
+                    areaLegend.appendChild(item);
+
+                    item.addEventListener('click', function(e) {
+                        const checkbox = this.querySelector('.filter-checkbox');
+                        if (e.target !== checkbox) {
+                            checkbox.checked = !checkbox.checked;
+                        }
+                        const area = this.dataset.area;
+                        activeAreaFilters[area] = checkbox.checked;
+
+                        if (checkbox.checked) {
+                            this.classList.add('active');
+                            this.classList.remove('inactive');
+                        } else {
+                            this.classList.remove('active');
+                            this.classList.add('inactive');
+                        }
+                        updateMarkers();
+                    });
+                });
+            }
+
+
             // Get price color
             function getPriceColor(price) {
                 if (price < 40) return '#2ecc71'; // green
@@ -2006,7 +2063,7 @@
 
                 visibleBars = bars.filter(bar => {
                     const currentPrice = getCurrentPrice(bar, currentTime, currentDay);
-                    if (!isPriceInActiveFilters(currentPrice)) {
+                    if (!isPriceInActiveFilters(currentPrice) || !activeAreaFilters[bar.area]) {
                         return false;
                     }
 
@@ -2106,6 +2163,7 @@
             });
 
             // Initial load
+            populateAreaFilters();
             updateMarkers();
 
             // Filter event listeners
